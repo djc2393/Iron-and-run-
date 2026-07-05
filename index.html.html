@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Iron &amp; Trail</title>
+
+<!-- iPhone home-screen app settings -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Iron &amp; Trail" />
+<meta name="theme-color" content="#F3F3EF" />
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;900&family=IBM+Plex+Mono:wght@400;600;700&display=swap" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; background: #F3F3EF; -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  input, textarea { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+/* ────────────────────────────────────────────────
+   IRON & TRAIL v2 — personal hybrid tracker
+   Now with mesocycle (block) management:
+   multiple blocks, active switching, duplication,
+   archiving, and paste-in blocks from your coach.
+──────────────────────────────────────────────── */
+
+const STORAGE_KEY = "iron-trail-v2";
+const LEGACY_KEY = "iron-trail-v1";
+
+const BLOCK_1 = {
+  id: "b1",
+  name: "Ultra Prep — Block 1",
+  phase: "Kosciuszko 100k build · maintain strength, bulletproof hips, minimal recovery cost",
+  dates: "7 Jul – 26 Nov 2026",
+  archived: false,
+  sessions: [
+    {
+      id: "A",
+      name: "Full Body A",
+      day: "Monday",
+      exercises: [
+        { id: "tbdl", name: "Trap Bar Deadlift", scheme: "3 × 5", rpe: "RPE 7", rest: "3 min", sets: 3, note: "Crisp reps. No grinding — you race on these legs." },
+        { id: "dbb", name: "DB Bench Press", scheme: "3 × 6–8", rpe: "RPE 8", rest: "2 min", sets: 3, note: "Per dumbbell weight." },
+        { id: "chin", name: "Chin-Up", scheme: "3 × AMRAP−2", rpe: "2 RIR", rest: "2 min", sets: 3, note: "Add weight if 12+ reps. Log added kg or leave blank." },
+        { id: "slrdl", name: "Single-Leg RDL", scheme: "2 × 8 / side", rpe: "RPE 7", rest: "90 s", sets: 2, note: "Hip health work. Slow eccentric." },
+        { id: "cope", name: "Copenhagen Plank", scheme: "3 × 20–30 s / side", rpe: "—", rest: "60 s", sets: 3, note: "Log seconds in reps field." },
+        { id: "carry", name: "Farmer's Carry", scheme: "3 × 40 m", rpe: "Heavy", rest: "90 s", sets: 3, note: "Total load in weight field." },
+      ],
+    },
+    {
+      id: "B",
+      name: "Full Body B",
+      day: "Thursday",
+      exercises: [
+        { id: "bss", name: "Bulgarian Split Squat", scheme: "3 × 8 / side", rpe: "RPE 7–8", rest: "2 min", sets: 3, note: "Eccentric control — protects quads for descents." },
+        { id: "ohp", name: "Overhead Press", scheme: "3 × 6–8", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "row", name: "Chest-Supported Row", scheme: "3 × 8–10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "Upper back thickness, zero lower-back cost." },
+        { id: "thrust", name: "Hip Thrust", scheme: "3 × 10", rpe: "RPE 7", rest: "90 s", sets: 3, note: "Glute drive for the climbs." },
+        { id: "hlr", name: "Hanging Leg Raise", scheme: "3 × 10", rpe: "—", rest: "60 s", sets: 3, note: "Hip flexor strength through range." },
+        { id: "sled", name: "Sled Push / Carry", scheme: "3 rounds", rpe: "Optional", rest: "As needed", sets: 3, note: "Skip if time-poor. The run is the priority." },
+      ],
+    },
+  ],
+};
+
+const CYCLE_2_A = {
+  id: "c2a",
+  name: "Cycle 2 · Option A — Upper/Lower 4-Day",
+  phase: "RECOMMENDED · Post-race hypertrophy. Best growth-per-hour if you can hold 4 lifting days. 2 easy runs/wk keep the engine.",
+  dates: "Dec 2026 – Feb 2027",
+  archived: false,
+  sessions: [
+    {
+      id: "U1",
+      name: "Upper 1",
+      day: "Monday",
+      exercises: [
+        { id: "bench", name: "Barbell Bench Press", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2–3 min", sets: 4, note: "Top priority lift of the day." },
+        { id: "chin", name: "Weighted Chin-Up", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2 min", sets: 4, note: "" },
+        { id: "dbohp", name: "Seated DB Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "row", name: "Chest-Supported Row", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "90 s", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "Spartan shoulders live here." },
+        { id: "curl", name: "Incline DB Curl", scheme: "3 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 3, note: "Superset with triceps if short on time." },
+      ],
+    },
+    {
+      id: "L1",
+      name: "Lower 1",
+      day: "Tuesday",
+      exercises: [
+        { id: "squat", name: "Back Squat", scheme: "4 × 5–6", rpe: "RPE 8", rest: "3 min", sets: 4, note: "" },
+        { id: "rdl", name: "Romanian Deadlift", scheme: "3 × 8", rpe: "RPE 8", rest: "2–3 min", sets: 3, note: "" },
+        { id: "bss", name: "Bulgarian Split Squat", scheme: "3 × 10 / side", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "calf", name: "Standing Calf Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "cope", name: "Copenhagen Plank", scheme: "3 × 30 s / side", rpe: "—", rest: "60 s", sets: 3, note: "Keep the hip insurance policy going." },
+      ],
+    },
+    {
+      id: "U2",
+      name: "Upper 2",
+      day: "Thursday",
+      exercises: [
+        { id: "ohp", name: "Overhead Press", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2–3 min", sets: 4, note: "" },
+        { id: "pullup", name: "Pull-Up", scheme: "4 × 8–10", rpe: "RPE 8–9", rest: "2 min", sets: 4, note: "" },
+        { id: "incline", name: "Incline DB Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "90 s", sets: 3, note: "Upper chest thickness." },
+        { id: "cablerow", name: "Seated Cable Row", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "90 s", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "tri", name: "Overhead Cable Triceps", scheme: "3 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+    {
+      id: "L2",
+      name: "Lower 2",
+      day: "Friday",
+      exercises: [
+        { id: "tbdl", name: "Trap Bar Deadlift", scheme: "4 × 5", rpe: "RPE 8", rest: "3 min", sets: 4, note: "Progress carries over from Block 1." },
+        { id: "thrust", name: "Hip Thrust", scheme: "3 × 10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "legpress", name: "Leg Press", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "2 min", sets: 3, note: "" },
+        { id: "hamcurl", name: "Seated Hamstring Curl", scheme: "3 × 10–12", rpe: "RPE 9", rest: "90 s", sets: 3, note: "" },
+        { id: "hlr", name: "Hanging Leg Raise", scheme: "3 × 10–12", rpe: "—", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+  ],
+};
+
+const CYCLE_2_B = {
+  id: "c2b",
+  name: "Cycle 2 · Option B — Full Body 3-Day",
+  phase: "SURVIVAL MODE · Same stimulus, minimum schedule. Pick this if baby sleep collapses or work peaks. 3 lifts/wk, ~90% of the growth.",
+  dates: "Dec 2026 – Feb 2027",
+  archived: false,
+  sessions: [
+    {
+      id: "F1",
+      name: "Full Body 1",
+      day: "Monday",
+      exercises: [
+        { id: "squat", name: "Back Squat", scheme: "3 × 6", rpe: "RPE 8", rest: "3 min", sets: 3, note: "" },
+        { id: "incline", name: "Incline DB Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "chin", name: "Weighted Chin-Up", scheme: "3 × 8–10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "curl", name: "Incline DB Curl", scheme: "2 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 2, note: "" },
+      ],
+    },
+    {
+      id: "F2",
+      name: "Full Body 2",
+      day: "Wednesday",
+      exercises: [
+        { id: "tbdl", name: "Trap Bar Deadlift", scheme: "3 × 5", rpe: "RPE 8", rest: "3 min", sets: 3, note: "" },
+        { id: "ohp", name: "Overhead Press", scheme: "3 × 6–8", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "row", name: "Chest-Supported Row", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "90 s", sets: 3, note: "" },
+        { id: "cope", name: "Copenhagen Plank", scheme: "3 × 30 s / side", rpe: "—", rest: "60 s", sets: 3, note: "Hip insurance continues." },
+        { id: "tri", name: "Overhead Cable Triceps", scheme: "2 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 2, note: "" },
+      ],
+    },
+    {
+      id: "F3",
+      name: "Full Body 3",
+      day: "Friday",
+      exercises: [
+        { id: "bss", name: "Bulgarian Split Squat", scheme: "3 × 10 / side", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "dbb", name: "DB Bench Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "pullup", name: "Pull-Up", scheme: "3 × AMRAP−2", rpe: "2 RIR", rest: "2 min", sets: 3, note: "" },
+        { id: "thrust", name: "Hip Thrust", scheme: "3 × 10", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "Delts twice a week even in survival mode." },
+        { id: "hlr", name: "Hanging Leg Raise", scheme: "3 × 12", rpe: "—", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+  ],
+};
+
+const CYCLE_2_C = {
+  id: "c2c",
+  name: "Cycle 2 · Option C — 4-Day + Athlete Day",
+  phase: "FULL CHOCOLATE BOX · Option A plus a fifth athletic day (jumps, sleds, carries, intervals). Only if sleep, recovery, and schedule are all green.",
+  dates: "Dec 2026 – Feb 2027",
+  archived: false,
+  sessions: [
+    {
+      id: "U1",
+      name: "Upper 1",
+      day: "Monday",
+      exercises: [
+        { id: "bench", name: "Barbell Bench Press", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2–3 min", sets: 4, note: "" },
+        { id: "chin", name: "Weighted Chin-Up", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2 min", sets: 4, note: "" },
+        { id: "dbohp", name: "Seated DB Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "row", name: "Chest-Supported Row", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "90 s", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "curl", name: "Incline DB Curl", scheme: "3 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+    {
+      id: "L1",
+      name: "Lower 1",
+      day: "Tuesday",
+      exercises: [
+        { id: "squat", name: "Back Squat", scheme: "4 × 5–6", rpe: "RPE 8", rest: "3 min", sets: 4, note: "" },
+        { id: "rdl", name: "Romanian Deadlift", scheme: "3 × 8", rpe: "RPE 8", rest: "2–3 min", sets: 3, note: "" },
+        { id: "bss", name: "Bulgarian Split Squat", scheme: "3 × 10 / side", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "calf", name: "Standing Calf Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "cope", name: "Copenhagen Plank", scheme: "3 × 30 s / side", rpe: "—", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+    {
+      id: "U2",
+      name: "Upper 2",
+      day: "Thursday",
+      exercises: [
+        { id: "ohp", name: "Overhead Press", scheme: "4 × 6–8", rpe: "RPE 8", rest: "2–3 min", sets: 4, note: "" },
+        { id: "pullup", name: "Pull-Up", scheme: "4 × 8–10", rpe: "RPE 8–9", rest: "2 min", sets: 4, note: "" },
+        { id: "incline", name: "Incline DB Press", scheme: "3 × 8–10", rpe: "RPE 8", rest: "90 s", sets: 3, note: "" },
+        { id: "cablerow", name: "Seated Cable Row", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "90 s", sets: 3, note: "" },
+        { id: "latraise", name: "Lateral Raise", scheme: "3 × 12–15", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+        { id: "tri", name: "Overhead Cable Triceps", scheme: "3 × 10–12", rpe: "RPE 9", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+    {
+      id: "L2",
+      name: "Lower 2",
+      day: "Friday",
+      exercises: [
+        { id: "tbdl", name: "Trap Bar Deadlift", scheme: "4 × 5", rpe: "RPE 8", rest: "3 min", sets: 4, note: "" },
+        { id: "thrust", name: "Hip Thrust", scheme: "3 × 10", rpe: "RPE 8", rest: "2 min", sets: 3, note: "" },
+        { id: "legpress", name: "Leg Press", scheme: "3 × 10–12", rpe: "RPE 8–9", rest: "2 min", sets: 3, note: "" },
+        { id: "hamcurl", name: "Seated Hamstring Curl", scheme: "3 × 10–12", rpe: "RPE 9", rest: "90 s", sets: 3, note: "" },
+        { id: "hlr", name: "Hanging Leg Raise", scheme: "3 × 10–12", rpe: "—", rest: "60 s", sets: 3, note: "" },
+      ],
+    },
+    {
+      id: "ATH",
+      name: "Athlete Day",
+      day: "Saturday",
+      exercises: [
+        { id: "boxjump", name: "Box Jump", scheme: "4 × 3", rpe: "Max intent", rest: "2 min", sets: 4, note: "Full recovery between sets. Height in weight field (cm)." },
+        { id: "mbslam", name: "Med Ball Slam", scheme: "3 × 8", rpe: "Max intent", rest: "90 s", sets: 3, note: "" },
+        { id: "sled", name: "Sled Push", scheme: "4 × 20 m", rpe: "Hard", rest: "2 min", sets: 4, note: "" },
+        { id: "carry", name: "Farmer's Carry", scheme: "3 × 40 m", rpe: "Heavy", rest: "90 s", sets: 3, note: "" },
+        { id: "erg", name: "Row / Ski Intervals", scheme: "6 × 60 s hard", rpe: "RPE 8", rest: "60 s easy", sets: 6, note: "Log metres in weight field, seconds in reps." },
+      ],
+    },
+  ],
+};
+
+const RUN_TYPES = ["Zone 2", "Long Run", "Threshold", "Hills", "Recovery", "Race"];
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const epley = (w, r) => w * (1 + r / 30);
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+const startOfWeek = (d) => {
+  const x = new Date(d);
+  const day = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - day);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+
+const DEFAULT_DATA = { blocks: [BLOCK_1, CYCLE_2_A, CYCLE_2_B, CYCLE_2_C], activeBlockId: "b1", workouts: [], runs: [] };
+
+function loadInitial() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+    // migrate v1 (single program) if present
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const old = JSON.parse(legacy);
+      const b1 = { ...(old.program || BLOCK_1), id: "b1", archived: false };
+      return {
+        blocks: [b1, CYCLE_2_A, CYCLE_2_B, CYCLE_2_C],
+        activeBlockId: "b1",
+        workouts: (old.workouts || []).map((w) => ({ ...w, blockId: "b1" })),
+        runs: old.runs || [],
+      };
+    }
+    return DEFAULT_DATA;
+  } catch {
+    return DEFAULT_DATA;
+  }
+}
+
+function App() {
+  const [data, setData] = useState(null);
+  const [saveErr, setSaveErr] = useState(false);
+  const [tab, setTab] = useState("today");
+  const [active, setActive] = useState(null);
+  const [runForm, setRunForm] = useState(null);
+  const [toast, setToast] = useState("");
+  const [progressEx, setProgressEx] = useState("tbdl");
+  const [openHistory, setOpenHistory] = useState({});
+  const [openBlocks, setOpenBlocks] = useState({});
+  const [dataModal, setDataModal] = useState(null); // {mode:'export'|'import'|'addblock', text}
+
+  useEffect(() => { setData(loadInitial()); }, []);
+
+  const persist = (next) => {
+    setData(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      setSaveErr(false);
+    } catch {
+      setSaveErr(true);
+    }
+  };
+
+  const flash = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2400);
+  };
+
+  const activeBlock = data ? data.blocks.find((b) => b.id === data.activeBlockId) : null;
+
+  /* derived */
+  const weekStats = useMemo(() => {
+    if (!data) return { km: 0, lifts: 0, runs: 0, days: [] };
+    const ws = startOfWeek(new Date());
+    const inWeek = (iso) => new Date(iso) >= ws;
+    const runs = data.runs.filter((r) => inWeek(r.date));
+    const lifts = data.workouts.filter((w) => inWeek(w.date));
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(ws);
+      d.setDate(d.getDate() + i);
+      const key = d.toDateString();
+      return {
+        label: "MTWTFSS"[i],
+        hasLift: lifts.some((w) => new Date(w.date).toDateString() === key),
+        hasRun: runs.some((r) => new Date(r.date).toDateString() === key),
+        isToday: key === new Date().toDateString(),
+      };
+    });
+    return {
+      km: runs.reduce((s, r) => s + (parseFloat(r.km) || 0), 0),
+      lifts: lifts.length,
+      runs: runs.length,
+      days,
+    };
+  }, [data]);
+
+  const lastEntriesFor = (sessionId) => {
+    if (!data || !activeBlock) return null;
+    const prev = [...data.workouts]
+      .filter((w) => w.blockId === activeBlock.id && w.sessionId === sessionId)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    return prev ? prev.entries : null;
+  };
+
+  /* workout flow */
+  const startWorkout = (session) => {
+    const entries = {};
+    session.exercises.forEach((ex) => {
+      entries[ex.id] = Array.from({ length: ex.sets }, () => ({ w: "", r: "", rpe: "", done: false }));
+    });
+    setActive({ blockId: activeBlock.id, sessionId: session.id, entries });
+  };
+
+  const updateSet = (exId, i, field, val) => {
+    setActive((a) => ({
+      ...a,
+      entries: { ...a.entries, [exId]: a.entries[exId].map((s, j) => (j === i ? { ...s, [field]: val } : s)) },
+    }));
+  };
+
+  const addSet = (exId) => {
+    setActive((a) => ({ ...a, entries: { ...a.entries, [exId]: [...a.entries[exId], { w: "", r: "", rpe: "", done: false }] } }));
+  };
+
+  const finishWorkout = () => {
+    const filled = Object.values(active.entries).some((sets) => sets.some((s) => s.r || s.w));
+    if (!filled) { flash("Log at least one set first"); return; }
+    const cleaned = {};
+    Object.entries(active.entries).forEach(([exId, sets]) => {
+      const kept = sets.filter((s) => s.r || s.w);
+      if (kept.length) cleaned[exId] = kept.map(({ w, r, rpe }) => ({ w, r, rpe }));
+    });
+    persist({
+      ...data,
+      workouts: [...data.workouts, { id: uid(), date: new Date().toISOString(), blockId: active.blockId, sessionId: active.sessionId, entries: cleaned }],
+    });
+    setActive(null);
+    setTab("today");
+    flash("Session saved. Good work.");
+  };
+
+  const saveRun = () => {
+    if (!runForm.km && !runForm.min) { flash("Add a distance or time"); return; }
+    persist({ ...data, runs: [...data.runs, { id: uid(), date: new Date().toISOString(), ...runForm }] });
+    setRunForm(null);
+    flash("Run logged.");
+  };
+
+  const deleteItem = (kind, id) => {
+    const next = kind === "workout"
+      ? { ...data, workouts: data.workouts.filter((w) => w.id !== id) }
+      : { ...data, runs: data.runs.filter((r) => r.id !== id) };
+    persist(next);
+    flash("Deleted.");
+  };
+
+  /* block management */
+  const setActiveBlock = (id) => {
+    persist({ ...data, activeBlockId: id });
+    flash("Block activated. Today tab updated.");
+  };
+
+  const duplicateBlock = (block) => {
+    const copy = JSON.parse(JSON.stringify(block));
+    copy.id = uid();
+    copy.name = block.name.replace(/ \(draft\)/, "") + " (copy)";
+    copy.archived = false;
+    persist({ ...data, blocks: [...data.blocks, copy] });
+    flash("Block duplicated.");
+  };
+
+  const toggleArchive = (block) => {
+    if (block.id === data.activeBlockId && !block.archived) {
+      flash("Can't archive the active block. Activate another first.");
+      return;
+    }
+    persist({
+      ...data,
+      blocks: data.blocks.map((b) => (b.id === block.id ? { ...b, archived: !b.archived } : b)),
+    });
+    flash(block.archived ? "Block restored." : "Block archived. History is kept.");
+  };
+
+  const addBlockFromJson = () => {
+    try {
+      const parsed = JSON.parse(dataModal.text);
+      if (!parsed.name || !Array.isArray(parsed.sessions)) throw new Error();
+      parsed.sessions.forEach((s) => {
+        if (!s.id || !s.name || !Array.isArray(s.exercises)) throw new Error();
+        s.exercises.forEach((e) => {
+          if (!e.id || !e.name) throw new Error();
+          e.sets = e.sets || 3;
+          e.scheme = e.scheme || "3 × 8";
+          e.rpe = e.rpe || "";
+          e.rest = e.rest || "";
+          e.note = e.note || "";
+        });
+      });
+      const block = { ...parsed, id: parsed.id && !data.blocks.some((b) => b.id === parsed.id) ? parsed.id : uid(), archived: false };
+      persist({ ...data, blocks: [...data.blocks, block] });
+      setDataModal(null);
+      flash("Block added. Activate it when you're ready.");
+    } catch {
+      flash("Invalid block JSON — check the format.");
+    }
+  };
+
+  /* export / import */
+  const openExport = () => setDataModal({ mode: "export", text: JSON.stringify(data, null, 1) });
+  const openImport = () => setDataModal({ mode: "import", text: "" });
+  const openAddBlock = () => setDataModal({ mode: "addblock", text: "" });
+  const doImport = () => {
+    try {
+      const parsed = JSON.parse(dataModal.text);
+      if (!Array.isArray(parsed.blocks) || !Array.isArray(parsed.workouts) || !Array.isArray(parsed.runs)) throw new Error();
+      persist(parsed);
+      setDataModal(null);
+      flash("Data restored.");
+    } catch {
+      flash("That doesn't look like a valid backup.");
+    }
+  };
+  const copyExport = () => {
+    try {
+      const ta = document.getElementById("export-ta");
+      ta.select();
+      ta.setSelectionRange(0, 999999);
+      document.execCommand("copy");
+      flash("Copied — paste it somewhere safe.");
+    } catch {
+      flash("Select the text and copy manually.");
+    }
+  };
+
+  /* progress */
+  const allExercises = useMemo(() => {
+    if (!data) return [];
+    const seen = {};
+    const list = [];
+    data.blocks.forEach((b) => b.sessions.forEach((s) => s.exercises.forEach((e) => {
+      if (!seen[e.id]) { seen[e.id] = true; list.push(e); }
+    })));
+    return list;
+  }, [data]);
+
+  const progressSeries = useMemo(() => {
+    if (!data) return { points: [], metric: "" };
+    const pts = [];
+    let weighted = false;
+    [...data.workouts].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach((w) => {
+      const sets = w.entries[progressEx];
+      if (!sets) return;
+      let best = 0;
+      sets.forEach((s) => {
+        const wt = parseFloat(s.w), r = parseFloat(s.r);
+        if (wt && r) { weighted = true; best = Math.max(best, epley(wt, r)); }
+        else if (r) best = Math.max(best, r);
+      });
+      if (best) pts.push({ date: w.date, val: best });
+    });
+    return { points: pts, metric: weighted ? "est. 1RM (kg)" : "best reps / secs" };
+  }, [data, progressEx]);
+
+  if (!data) {
+    return <div style={sx.shell}><div style={sx.center}>LOADING LOGBOOK…</div></div>;
+  }
+
+  const session = active
+    ? (data.blocks.find((b) => b.id === active.blockId) || {}).sessions.find((s) => s.id === active.sessionId)
+    : null;
+
+  return (
+    <div style={sx.shell}>
+      <header style={sx.header}>
+        <div>
+          <div style={sx.eyebrow}>PERSONAL LOGBOOK</div>
+          <div style={sx.title}>IRON &amp; TRAIL</div>
+        </div>
+        <div style={sx.blockTag}>
+          <div style={sx.blockTagPhase}>{activeBlock ? activeBlock.name.split("—")[0].trim().toUpperCase() : "NO BLOCK"}</div>
+          <div style={sx.blockTagDates}>{activeBlock ? activeBlock.dates : ""}</div>
+        </div>
+      </header>
+
+      {saveErr && <div style={sx.warn}>Couldn't save — storage may be full or blocked. Export a backup.</div>}
+
+      {active && session ? (
+        <ActiveWorkout
+          session={session}
+          entries={active.entries}
+          prev={lastEntriesFor(session.id)}
+          onSet={updateSet}
+          onAddSet={addSet}
+          onFinish={finishWorkout}
+          onCancel={() => setActive(null)}
+        />
+      ) : (
+        <React.Fragment>
+          {tab === "today" && (
+            <Today block={activeBlock} weekStats={weekStats} onStart={startWorkout}
+              onLogRun={() => setRunForm({ type: "Zone 2", km: "", min: "", notes: "" })}
+              goBlocks={() => setTab("blocks")} />
+          )}
+          {tab === "blocks" && (
+            <Blocks data={data} open={openBlocks} setOpen={setOpenBlocks}
+              onActivate={setActiveBlock} onDuplicate={duplicateBlock} onArchive={toggleArchive}
+              onAddBlock={openAddBlock} onExport={openExport} onImport={openImport} />
+          )}
+          {tab === "history" && <History data={data} open={openHistory} setOpen={setOpenHistory} onDelete={deleteItem} />}
+          {tab === "progress" && (
+            <Progress exercises={allExercises} selected={progressEx} onSelect={setProgressEx} series={progressSeries} />
+          )}
+        </React.Fragment>
+      )}
+
+      {runForm && (
+        <div style={sx.modalBack} onClick={() => setRunForm(null)}>
+          <div style={sx.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={sx.modalTitle}>LOG RUN</div>
+            <label style={sx.label}>Type</label>
+            <div style={sx.chipRow}>
+              {RUN_TYPES.map((t) => (
+                <button key={t} style={{ ...sx.chip, ...(runForm.type === t ? sx.chipOn : {}) }}
+                  onClick={() => setRunForm({ ...runForm, type: t })}>{t}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={sx.label}>Distance (km)</label>
+                <input style={sx.input} inputMode="decimal" value={runForm.km}
+                  onChange={(e) => setRunForm({ ...runForm, km: e.target.value })} placeholder="0.0" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={sx.label}>Time (min)</label>
+                <input style={sx.input} inputMode="decimal" value={runForm.min}
+                  onChange={(e) => setRunForm({ ...runForm, min: e.target.value })} placeholder="0" />
+              </div>
+            </div>
+            <label style={sx.label}>Notes</label>
+            <input style={sx.input} value={runForm.notes}
+              onChange={(e) => setRunForm({ ...runForm, notes: e.target.value })} placeholder="Felt easy, HR 135 avg…" />
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={sx.btnGhost} onClick={() => setRunForm(null)}>Cancel</button>
+              <button style={sx.btnPrimary} onClick={saveRun}>Save run</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dataModal && (
+        <div style={sx.modalBack} onClick={() => setDataModal(null)}>
+          <div style={sx.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={sx.modalTitle}>
+              {dataModal.mode === "export" ? "BACKUP DATA" : dataModal.mode === "import" ? "RESTORE DATA" : "ADD BLOCK"}
+            </div>
+            <div style={{ fontSize: 12, color: "#5C6066", lineHeight: 1.5, marginBottom: 10 }}>
+              {dataModal.mode === "export" && "Copy this and save it in Notes or email it to yourself. It's your entire logbook."}
+              {dataModal.mode === "import" && "Paste a backup below and restore. This replaces everything currently in the app."}
+              {dataModal.mode === "addblock" && "Paste a block JSON from your coach. It's added as inactive — activate it when the mesocycle starts."}
+            </div>
+            <textarea id="export-ta" style={sx.textarea} value={dataModal.text}
+              readOnly={dataModal.mode === "export"}
+              onChange={(e) => setDataModal({ ...dataModal, text: e.target.value })}
+              placeholder={dataModal.mode !== "export" ? "Paste JSON here…" : ""} />
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <button style={sx.btnGhost} onClick={() => setDataModal(null)}>Close</button>
+              {dataModal.mode === "export" && <button style={sx.btnPrimary} onClick={copyExport}>Copy backup</button>}
+              {dataModal.mode === "import" && <button style={sx.btnPrimary} onClick={doImport}>Restore</button>}
+              {dataModal.mode === "addblock" && <button style={sx.btnPrimary} onClick={addBlockFromJson}>Add block</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <div style={sx.toast}>{toast}</div>}
+
+      {!active && (
+        <nav style={sx.nav}>
+          {[["today", "Today"], ["blocks", "Blocks"], ["history", "History"], ["progress", "Progress"]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ ...sx.navBtn, ...(tab === id ? sx.navBtnOn : {}) }}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+    </div>
+  );
+}
+
+/* ════════════ TODAY ════════════ */
+function Today({ block, weekStats, onStart, onLogRun, goBlocks }) {
+  return (
+    <div style={sx.page}>
+      <div style={sx.card}>
+        <div style={sx.cardEyebrow}>THIS WEEK</div>
+        <div style={{ display: "flex", justifyContent: "space-between", margin: "12px 0 14px" }}>
+          {weekStats.days.map((d, i) => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ ...sx.dayLabel, ...(d.isToday ? { color: "#F04E12" } : {}) }}>{d.label}</div>
+              <div style={{ display: "flex", gap: 3, justifyContent: "center", marginTop: 6 }}>
+                <span style={{ ...sx.dot, background: d.hasLift ? "#17191C" : "#E4E3DD" }} />
+                <span style={{ ...sx.dot, background: d.hasRun ? "#F04E12" : "#E4E3DD" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 18 }}>
+          <Stat big={weekStats.km.toFixed(1)} small="KM RUN" />
+          <Stat big={weekStats.runs} small="RUNS" />
+          <Stat big={weekStats.lifts} small="LIFTS" />
+        </div>
+        <div style={sx.legend}>
+          <span style={{ ...sx.dot, background: "#17191C" }} /> lift&nbsp;&nbsp;
+          <span style={{ ...sx.dot, background: "#F04E12" }} /> run
+        </div>
+      </div>
+
+      {!block && (
+        <div style={{ ...sx.card, textAlign: "center", color: "#82868D", padding: 30 }}>
+          No active block. <button style={{ ...sx.addSet, fontSize: 13 }} onClick={goBlocks}>Choose one in Blocks →</button>
+        </div>
+      )}
+
+      {block && block.sessions.map((s) => (
+        <button key={s.id} style={sx.sessionCard} onClick={() => onStart(s)}>
+          <div style={sx.bib}>{s.id}</div>
+          <div style={{ flex: 1, textAlign: "left" }}>
+            <div style={sx.sessionName}>{s.name}</div>
+            <div style={sx.sessionMeta}>{s.day} · {s.exercises.length} exercises</div>
+          </div>
+          <div style={sx.startArrow}>START →</div>
+        </button>
+      ))}
+
+      <button style={sx.runCard} onClick={onLogRun}>
+        <div style={{ ...sx.bib, borderColor: "#F04E12", color: "#F04E12" }}>R</div>
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <div style={sx.sessionName}>Log a run</div>
+          <div style={sx.sessionMeta}>Z2 · Threshold · Hills · Long</div>
+        </div>
+        <div style={{ ...sx.startArrow, color: "#F04E12" }}>LOG →</div>
+      </button>
+
+      {block && (
+        <div style={sx.phaseNote}>
+          <span style={{ color: "#F04E12", fontWeight: 700 }}>BLOCK FOCUS · </span>
+          {block.phase}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ big, small }) {
+  return (
+    <div>
+      <div style={sx.statBig}>{big}</div>
+      <div style={sx.statSmall}>{small}</div>
+    </div>
+  );
+}
+
+/* ════════════ ACTIVE WORKOUT ════════════ */
+function ActiveWorkout({ session, entries, prev, onSet, onAddSet, onFinish, onCancel }) {
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [timerTotal, setTimerTotal] = useState(0);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const t = setTimeout(() => setTimeLeft((x) => x - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timeLeft]);
+
+  const startTimer = (secs) => { setTimerTotal(secs); setTimeLeft(secs); };
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  return (
+    <div style={{ ...sx.page, paddingBottom: 130 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+        <div style={{ ...sx.bib, width: 54, height: 54, fontSize: session.id.length > 1 ? 20 : 28 }}>{session.id}</div>
+        <div style={{ flex: 1 }}>
+          <div style={sx.sessionName}>{session.name}</div>
+          <div style={sx.sessionMeta}>Beat the grey numbers.</div>
+        </div>
+        <button style={sx.cancelBtn} onClick={onCancel}>✕</button>
+      </div>
+
+      {session.exercises.map((ex) => {
+        const prevSets = prev && prev[ex.id];
+        return (
+          <div key={ex.id} style={sx.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div style={sx.exName}>{ex.name}</div>
+              <div style={sx.exScheme}>{ex.scheme}</div>
+            </div>
+            <div style={sx.exMeta}>{ex.rpe}{ex.rest ? ` · rest ${ex.rest}` : ""}</div>
+            {ex.note && <div style={sx.exNote}>{ex.note}</div>}
+
+            <div style={sx.setHeader}>
+              <span style={{ width: 26 }}>SET</span>
+              <span style={{ flex: 1 }}>PREV</span>
+              <span style={{ width: 62, textAlign: "center" }}>KG</span>
+              <span style={{ width: 54, textAlign: "center" }}>REPS</span>
+              <span style={{ width: 48, textAlign: "center" }}>RPE</span>
+              <span style={{ width: 34 }} />
+            </div>
+
+            {entries[ex.id].map((set, i) => {
+              const p = prevSets && prevSets[i];
+              const ghost = p ? `${p.w ? p.w + "×" : ""}${p.r || "—"}${p.rpe ? " @" + p.rpe : ""}` : "—";
+              return (
+                <div key={i} style={{ ...sx.setRow, ...(set.done ? sx.setRowDone : {}) }}>
+                  <span style={sx.setNum}>{i + 1}</span>
+                  <span style={sx.ghost}>{ghost}</span>
+                  <input style={sx.setInput} inputMode="decimal" value={set.w}
+                    placeholder={p && p.w ? p.w : ""} onChange={(e) => onSet(ex.id, i, "w", e.target.value)} />
+                  <input style={{ ...sx.setInput, width: 54 }} inputMode="decimal" value={set.r}
+                    placeholder={p && p.r ? p.r : ""} onChange={(e) => onSet(ex.id, i, "r", e.target.value)} />
+                  <input style={{ ...sx.setInput, width: 48 }} inputMode="decimal" value={set.rpe}
+                    placeholder={p && p.rpe ? p.rpe : ""} onChange={(e) => onSet(ex.id, i, "rpe", e.target.value)} />
+                  <button style={{ ...sx.doneBtn, ...(set.done ? sx.doneBtnOn : {}) }}
+                    onClick={() => onSet(ex.id, i, "done", !set.done)} aria-label="mark set done">✓</button>
+                </div>
+              );
+            })}
+            <button style={sx.addSet} onClick={() => onAddSet(ex.id)}>+ add set</button>
+          </div>
+        );
+      })}
+
+      <button style={{ ...sx.btnPrimary, width: "100%", padding: "16px 0", fontSize: 15 }} onClick={onFinish}>
+        FINISH SESSION
+      </button>
+
+      <div style={sx.timerBar}>
+        {timeLeft > 0 ? (
+          <React.Fragment>
+            <div style={{ ...sx.timerClock, color: timeLeft <= 10 ? "#F04E12" : "#F3F3EF" }}>{mmss(timeLeft)}</div>
+            <div style={sx.timerTrack}>
+              <div style={{ ...sx.timerFill, width: `${(timeLeft / timerTotal) * 100}%` }} />
+            </div>
+            <button style={sx.timerCancel} onClick={() => setTimeLeft(0)}>✕</button>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <span style={sx.timerLabel}>REST</span>
+            {[60, 90, 120, 180].map((s) => (
+              <button key={s} style={sx.timerBtn} onClick={() => startTimer(s)}>{mmss(s)}</button>
+            ))}
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════ BLOCKS (mesocycle management) ════════════ */
+function Blocks({ data, open, setOpen, onActivate, onDuplicate, onArchive, onAddBlock, onExport, onImport }) {
+  const activeFirst = [...data.blocks].sort((a, b) =>
+    (a.id === data.activeBlockId ? -1 : 0) - (b.id === data.activeBlockId ? -1 : 0) || (a.archived ? 1 : 0) - (b.archived ? 1 : 0)
+  );
+
+  return (
+    <div style={sx.page}>
+      <div style={sx.phaseNote}>
+        Your training blocks (mesocycles). One is active at a time — it drives the Today tab.
+        History and progress carry across blocks, so a trap bar pull in Block 2 continues the Block 1 trend line.
+      </div>
+
+      {activeFirst.map((b) => {
+        const isActive = b.id === data.activeBlockId;
+        const count = data.workouts.filter((w) => w.blockId === b.id).length;
+        return (
+          <div key={b.id} style={{ ...sx.card, ...(b.archived ? { opacity: 0.55 } : {}), ...(isActive ? { border: "1.5px solid #17191C" } : {}) }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ ...sx.exName, fontSize: 16 }}>{b.name}</div>
+                  {isActive && <span style={sx.badgeActive}>ACTIVE</span>}
+                  {b.archived && <span style={sx.badgeArchived}>ARCHIVED</span>}
+                </div>
+                <div style={{ ...sx.exMeta, marginTop: 4 }}>{b.dates} · {b.sessions.length} sessions · {count} logged</div>
+                <div style={sx.exNote}>{b.phase}</div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+              {!isActive && !b.archived && (
+                <button style={sx.miniBtnPrimary} onClick={() => onActivate(b.id)}>Make active</button>
+              )}
+              <button style={sx.miniBtn} onClick={() => setOpen({ ...open, [b.id]: !open[b.id] })}>
+                {open[b.id] ? "Hide sessions" : "View sessions"}
+              </button>
+              <button style={sx.miniBtn} onClick={() => onDuplicate(b)}>Duplicate</button>
+              <button style={sx.miniBtn} onClick={() => onArchive(b)}>{b.archived ? "Restore" : "Archive"}</button>
+            </div>
+
+            {open[b.id] && (
+              <div style={{ marginTop: 12, borderTop: "1px solid #E4E3DD", paddingTop: 6 }}>
+                {b.sessions.map((s) => (
+                  <div key={s.id}>
+                    <div style={{ ...sx.exMeta, marginTop: 10, fontWeight: 700, color: "#17191C" }}>
+                      {s.id} · {s.name} · {s.day}
+                    </div>
+                    {s.exercises.map((ex) => (
+                      <div key={ex.id} style={sx.programRow}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ex.name}</div>
+                        <div style={{ ...sx.programScheme, fontSize: 12 }}>
+                          {ex.scheme}<span style={{ color: "#82868D" }}> {ex.rpe}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+        <button style={sx.btnGhost} onClick={onAddBlock}>+ Add block</button>
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        <button style={sx.btnGhost} onClick={onExport}>Backup data</button>
+        <button style={sx.btnGhost} onClick={onImport}>Restore data</button>
+      </div>
+      <div style={{ ...sx.phaseNote, marginTop: 12 }}>
+        Deload: every 4th week of the active block, drop lifting to 2 sets per exercise at RPE 6.
+        Review the block with your coach every 8 weeks — bring the History tab.
+      </div>
+    </div>
+  );
+}
+
+/* ════════════ HISTORY ════════════ */
+function History({ data, open, setOpen, onDelete }) {
+  const items = useMemo(() => {
+    const w = data.workouts.map((x) => ({ ...x, kind: "workout" }));
+    const r = data.runs.map((x) => ({ ...x, kind: "run" }));
+    return [...w, ...r].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [data]);
+
+  const lookup = (blockId, sessionId) => {
+    const b = data.blocks.find((b) => b.id === blockId);
+    const s = b && b.sessions.find((s) => s.id === sessionId);
+    return { session: s, exName: (exId) => {
+      const e = s && s.exercises.find((e) => e.id === exId);
+      return e ? e.name : exId;
+    }};
+  };
+
+  if (!items.length) {
+    return (
+      <div style={sx.page}>
+        <div style={{ ...sx.card, textAlign: "center", color: "#82868D", padding: 40 }}>
+          Nothing logged yet. Start a session — the logbook fills itself.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={sx.page}>
+      {items.map((it) => {
+        if (it.kind === "run") {
+          return (
+            <div key={it.id} style={sx.card}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ ...sx.bib, width: 34, height: 34, fontSize: 15, borderColor: "#F04E12", color: "#F04E12" }}>R</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {it.type} {it.km ? `· ${it.km} km` : ""} {it.min ? `· ${it.min} min` : ""}
+                  </div>
+                  <div style={sx.exMeta}>{fmtDate(it.date)}{it.notes ? ` — ${it.notes}` : ""}</div>
+                </div>
+                <button style={sx.delBtn} onClick={() => onDelete("run", it.id)}>del</button>
+              </div>
+            </div>
+          );
+        }
+        const { session, exName } = lookup(it.blockId, it.sessionId);
+        return (
+          <div key={it.id} style={sx.card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+              onClick={() => setOpen({ ...open, [it.id]: !open[it.id] })}>
+              <div style={{ ...sx.bib, width: 34, height: 34, fontSize: it.sessionId.length > 1 ? 12 : 15 }}>{it.sessionId}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{session ? session.name : `Session ${it.sessionId}`}</div>
+                <div style={sx.exMeta}>{fmtDate(it.date)} · {Object.keys(it.entries).length} exercises</div>
+              </div>
+              <span style={{ color: "#82868D", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12 }}>
+                {open[it.id] ? "▲" : "▼"}
+              </span>
+            </div>
+            {open[it.id] && (
+              <div style={{ marginTop: 12, borderTop: "1px solid #E4E3DD", paddingTop: 10 }}>
+                {Object.entries(it.entries).map(([exId, sets]) => (
+                  <div key={exId} style={sx.programRow}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{exName(exId)}</div>
+                    <div style={{ ...sx.programScheme, fontSize: 12 }}>
+                      {sets.map((s, i) => (
+                        <span key={i}>
+                          {s.w ? `${s.w}×` : ""}{s.r || "—"}{s.rpe ? `@${s.rpe}` : ""}{i < sets.length - 1 ? "  " : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <button style={{ ...sx.delBtn, marginTop: 8 }} onClick={() => onDelete("workout", it.id)}>
+                  delete session
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ════════════ PROGRESS ════════════ */
+function Progress({ exercises, selected, onSelect, series }) {
+  const pts = series.points;
+  const last = pts[pts.length - 1];
+  const first = pts[0];
+  const delta = last && first && pts.length > 1 ? last.val - first.val : null;
+
+  return (
+    <div style={sx.page}>
+      <div style={sx.chipRow}>
+        {exercises.map((ex) => (
+          <button key={ex.id}
+            style={{ ...sx.chip, ...(selected === ex.id ? sx.chipOn : {}) }}
+            onClick={() => onSelect(ex.id)}>{ex.name}</button>
+        ))}
+      </div>
+
+      <div style={sx.card}>
+        {pts.length === 0 ? (
+          <div style={{ color: "#82868D", textAlign: "center", padding: 30, fontSize: 14 }}>
+            No data yet for this exercise. Log a session and the trend appears here.
+          </div>
+        ) : (
+          <React.Fragment>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div>
+                <div style={sx.statBig}>{last.val.toFixed(1)}</div>
+                <div style={sx.statSmall}>{series.metric.toUpperCase()}</div>
+              </div>
+              {delta !== null && (
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, fontWeight: 700, color: delta >= 0 ? "#23794B" : "#F04E12" }}>
+                  {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)} all-time
+                </div>
+              )}
+            </div>
+            <Chart points={pts} />
+            <div style={{ marginTop: 14 }}>
+              {[...pts].reverse().slice(0, 6).map((p, i) => (
+                <div key={i} style={sx.programRow}>
+                  <span style={{ fontSize: 13, color: "#82868D" }}>{fmtDate(p.date)}</span>
+                  <span style={{ ...sx.programScheme, fontSize: 13 }}>{p.val.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+      <div style={sx.phaseNote}>
+        Estimated 1RM uses the Epley formula from your best set. Trends span all blocks —
+        the long game in one line. During the ultra block, flat is winning.
+      </div>
+    </div>
+  );
+}
+
+function Chart({ points }) {
+  const W = 320, H = 120, PAD = 10;
+  const vals = points.map((p) => p.val);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const x = (i) => points.length === 1 ? W / 2 : PAD + (i / (points.length - 1)) * (W - PAD * 2);
+  const y = (v) => H - PAD - ((v - min) / range) * (H - PAD * 2);
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p.val)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", marginTop: 12 }}>
+      <path d={path} fill="none" stroke="#F04E12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.val)} r="3.5" fill="#17191C" />)}
+    </svg>
+  );
+}
+
+/* ════════════ STYLES ════════════ */
+const sx = {
+  shell: {
+    minHeight: "100vh", background: "#F3F3EF", color: "#17191C",
+    fontFamily: "'Archivo', system-ui, sans-serif", paddingBottom: 90,
+    maxWidth: 560, margin: "0 auto",
+  },
+  center: { display: "flex", justifyContent: "center", paddingTop: 120, color: "#82868D", fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 },
+  header: {
+    display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+    padding: "calc(env(safe-area-inset-top, 0px) + 22px) 18px 14px",
+    borderBottom: "2px solid #17191C",
+  },
+  eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 2, color: "#82868D" },
+  title: { fontWeight: 900, fontSize: 26, letterSpacing: -0.5, lineHeight: 1.05 },
+  blockTag: { textAlign: "right", maxWidth: 160 },
+  blockTagPhase: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 700, color: "#F04E12", letterSpacing: 1 },
+  blockTagDates: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#82868D", marginTop: 2 },
+  warn: { background: "#FDECE4", color: "#B33A0C", fontSize: 12, padding: "8px 18px" },
+  page: { padding: "16px 14px 20px" },
+  card: { background: "#FFFFFF", border: "1px solid #E4E3DD", borderRadius: 10, padding: 16, marginBottom: 12 },
+  cardEyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 2, color: "#82868D" },
+  dayLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 700, color: "#17191C" },
+  dot: { width: 7, height: 7, borderRadius: 99, display: "inline-block" },
+  legend: { marginTop: 12, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#82868D", display: "flex", alignItems: "center", gap: 5 },
+  statBig: { fontWeight: 900, fontSize: 30, lineHeight: 1, fontFamily: "'Archivo', sans-serif" },
+  statSmall: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 1.5, color: "#82868D", marginTop: 4 },
+  sessionCard: {
+    display: "flex", alignItems: "center", gap: 14, width: "100%",
+    background: "#FFFFFF", border: "1px solid #17191C", borderRadius: 10,
+    padding: 16, marginBottom: 12, cursor: "pointer", fontFamily: "inherit",
+  },
+  runCard: {
+    display: "flex", alignItems: "center", gap: 14, width: "100%",
+    background: "#FFFFFF", border: "1px dashed #F04E12", borderRadius: 10,
+    padding: 16, marginBottom: 12, cursor: "pointer", fontFamily: "inherit",
+  },
+  bib: {
+    width: 44, height: 44, border: "2.5px solid #17191C", borderRadius: 8,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontWeight: 900, fontSize: 22, fontFamily: "'Archivo', sans-serif",
+    flexShrink: 0, background: "#F3F3EF",
+  },
+  sessionName: { fontWeight: 800, fontSize: 16, color: "#17191C" },
+  sessionMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#82868D", marginTop: 3 },
+  startArrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1, color: "#17191C" },
+  phaseNote: { fontSize: 12, color: "#5C6066", lineHeight: 1.6, padding: "4px 6px", marginBottom: 10 },
+  exName: { fontWeight: 800, fontSize: 15 },
+  exScheme: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F04E12" },
+  exMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#82868D", marginTop: 3 },
+  exNote: { fontSize: 12, color: "#5C6066", marginTop: 6, lineHeight: 1.5 },
+  setHeader: {
+    display: "flex", alignItems: "center", gap: 8, marginTop: 12,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, letterSpacing: 1, color: "#82868D",
+  },
+  setRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 },
+  setRowDone: { opacity: 0.55 },
+  setNum: { width: 26, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700 },
+  ghost: { flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "#B7BAC0" },
+  setInput: {
+    width: 62, padding: "10px 4px", border: "1px solid #E4E3DD", borderRadius: 7,
+    textAlign: "center", fontFamily: "'IBM Plex Mono', monospace", fontSize: 16,
+    fontWeight: 600, background: "#FAFAF8", color: "#17191C", outline: "none",
+  },
+  doneBtn: {
+    width: 34, height: 40, border: "1px solid #E4E3DD", borderRadius: 7,
+    background: "#FFFFFF", color: "#C9CCD1", fontSize: 15, cursor: "pointer",
+  },
+  doneBtnOn: { background: "#23794B", borderColor: "#23794B", color: "#FFFFFF" },
+  addSet: { marginTop: 10, background: "none", border: "none", color: "#82868D", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, cursor: "pointer", padding: 0 },
+  cancelBtn: { width: 36, height: 36, borderRadius: 99, border: "1px solid #E4E3DD", background: "#FFFFFF", fontSize: 14, cursor: "pointer", color: "#5C6066" },
+  programRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "9px 0", borderBottom: "1px solid #F0EFEA" },
+  programScheme: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap" },
+  chipRow: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  chip: { padding: "7px 12px", borderRadius: 99, border: "1px solid #E4E3DD", background: "#FFFFFF", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, cursor: "pointer", color: "#5C6066" },
+  chipOn: { background: "#17191C", borderColor: "#17191C", color: "#F3F3EF" },
+  badgeActive: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: 1,
+    background: "#F04E12", color: "#FFF", borderRadius: 4, padding: "3px 6px",
+  },
+  badgeArchived: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: 1,
+    background: "#C9CCD1", color: "#17191C", borderRadius: 4, padding: "3px 6px",
+  },
+  miniBtn: {
+    padding: "8px 12px", borderRadius: 7, border: "1px solid #C9CCD1", background: "#FFFFFF",
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 600, color: "#17191C", cursor: "pointer",
+  },
+  miniBtnPrimary: {
+    padding: "8px 12px", borderRadius: 7, border: "none", background: "#F04E12",
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 700, color: "#FFFFFF", cursor: "pointer",
+  },
+  modalBack: { position: "fixed", inset: 0, background: "rgba(23,25,28,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50 },
+  modal: {
+    background: "#F3F3EF", borderRadius: "16px 16px 0 0",
+    padding: "22px 18px calc(env(safe-area-inset-bottom, 0px) + 30px)",
+    width: "100%", maxWidth: 560,
+  },
+  modalTitle: { fontWeight: 900, fontSize: 18, marginBottom: 14, letterSpacing: -0.3 },
+  label: { display: "block", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 1.5, color: "#82868D", margin: "12px 0 6px", textTransform: "uppercase" },
+  input: {
+    width: "100%", padding: "12px 12px", border: "1px solid #E4E3DD", borderRadius: 8,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 16, background: "#FFFFFF",
+    color: "#17191C", outline: "none",
+  },
+  textarea: {
+    width: "100%", height: 140, padding: 10, border: "1px solid #E4E3DD", borderRadius: 8,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, background: "#FFFFFF",
+    color: "#17191C", outline: "none", resize: "none",
+  },
+  btnPrimary: {
+    flex: 1, padding: "13px 0", borderRadius: 9, border: "none",
+    background: "#F04E12", color: "#FFFFFF", fontWeight: 800, fontSize: 14,
+    letterSpacing: 0.5, cursor: "pointer", fontFamily: "'Archivo', sans-serif",
+  },
+  btnGhost: {
+    flex: 1, padding: "13px 0", borderRadius: 9, border: "1px solid #C9CCD1",
+    background: "transparent", color: "#17191C", fontWeight: 700, fontSize: 14,
+    cursor: "pointer", fontFamily: "'Archivo', sans-serif",
+  },
+  toast: {
+    position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)",
+    background: "#17191C", color: "#F3F3EF", padding: "10px 18px", borderRadius: 99,
+    fontSize: 13, fontWeight: 600, zIndex: 60, whiteSpace: "nowrap", maxWidth: "90%",
+    overflow: "hidden", textOverflow: "ellipsis",
+  },
+  nav: {
+    position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+    width: "100%", maxWidth: 560, display: "flex", background: "#FFFFFF",
+    borderTop: "2px solid #17191C", zIndex: 40,
+    paddingBottom: "env(safe-area-inset-bottom, 0px)",
+  },
+  navBtn: { flex: 1, padding: "15px 0 16px", background: "none", border: "none", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 0.5, color: "#82868D", cursor: "pointer" },
+  navBtnOn: { color: "#17191C", fontWeight: 700, boxShadow: "inset 0 3px 0 #F04E12" },
+  delBtn: { background: "none", border: "1px solid #E4E3DD", borderRadius: 6, color: "#B33A0C", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, padding: "5px 9px", cursor: "pointer" },
+  timerBar: {
+    position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+    width: "100%", maxWidth: 560, display: "flex", alignItems: "center", gap: 10,
+    background: "#17191C", padding: "14px 16px calc(env(safe-area-inset-bottom, 0px) + 14px)",
+    zIndex: 45,
+  },
+  timerLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 2, color: "#82868D" },
+  timerBtn: {
+    flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #3A3D42",
+    background: "transparent", color: "#F3F3EF",
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 700, cursor: "pointer",
+  },
+  timerClock: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 700, minWidth: 74 },
+  timerTrack: { flex: 1, height: 6, borderRadius: 99, background: "#3A3D42", overflow: "hidden" },
+  timerFill: { height: "100%", background: "#F04E12", transition: "width 1s linear" },
+  timerCancel: {
+    width: 34, height: 34, borderRadius: 99, border: "1px solid #3A3D42",
+    background: "transparent", color: "#82868D", fontSize: 13, cursor: "pointer",
+  },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
